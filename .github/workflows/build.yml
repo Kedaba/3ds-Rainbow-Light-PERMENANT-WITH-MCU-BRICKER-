@@ -13,18 +13,16 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install devkitPro
-      run: |
-        sudo mkdir -p /opt/devkitpro
-        wget -qO- https://downloads.devkitpro.org/devkitpro-pacman.tar.xz | sudo tar -xJ -C /opt/devkitpro
-        echo 'export DEVKITPRO=/opt/devkitpro' >> $GITHUB_ENV
-        echo 'export DEVKITARM=$DEVKITPRO/devkitARM' >> $GITHUB_ENV
-        echo 'export PATH=$DEVKITPRO/tools/bin:$PATH' >> $GITHUB_ENV
-
-    - name: Install devkitARM & libctru
-      run: |
-        /opt/devkitpro/tools/bin/dkp-pacman -Syu --noconfirm devkitARM libctru
+    - name: Setup devkitPro
+      uses: devkitPro/devkitpro-actions@v1
+      with:
+        packages: "devkitARM libctru"
 
     - name: Build 3DS project
-      run: |
-        make
+      run: make
+
+    - name: Upload 3DSX
+      uses: actions/upload-artifact@v3
+      with:
+        name: 3ds-build
+        path: build/launcher.3dsx
