@@ -8,39 +8,21 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitpro:latest
 
     steps:
-    # Step 1: Checkout your repo
     - uses: actions/checkout@v3
 
-    # Step 2: Install required dependencies
-    - name: Install system dependencies
+    - name: Install additional packages
       run: |
-        sudo apt-get update
-        sudo apt-get install -y git make gcc wget tar
+        apt-get update
+        apt-get install -y make gcc git
 
-    # Step 3: Install devkitPro manually
-    - name: Install devkitPro and devkitARM
-      run: |
-        curl -L https://downloads.devkitpro.org/devkitpro-pacman-2024.02.07-x86_64.tar.xz -o /tmp/devkitpro.tar.xz
-        sudo tar -xJf /tmp/devkitpro.tar.xz -C /opt
-        echo "export DEVKITPRO=/opt/devkitpro" >> $GITHUB_ENV
-        echo "export DEVKITARM=/opt/devkitpro/devkitARM" >> $GITHUB_ENV
-        echo "export PATH=/opt/devkitpro/devkitARM/bin:$PATH" >> $GITHUB_ENV
-
-    # Step 4: Install devkitARM & libctru packages
-    - name: Install devkitARM and libctru
-      shell: bash
-      run: |
-        source $GITHUB_ENV
-        /opt/devkitpro/devkitpro-pacman/bin/dkp-pacman -Syu --noconfirm devkitARM libctru
-
-    # Step 5: Build the 3DS project
-    - name: Build launcher
+    - name: Build project
       run: make
 
-    # Step 6: Upload the 3DSX artifact
-    - name: Upload 3DSX
+    - name: Upload 3DSX artifact
       uses: actions/upload-artifact@v4
       with:
         name: 3ds-build
