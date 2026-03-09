@@ -2,40 +2,45 @@ name: Build 3DS FIRM
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    container:
-      image: ghcr.io/devkitpro/devkitpro:latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Set up environment variables
+      - name: Install dependencies
         run: |
-          export DEVKITPRO=/opt/devkitpro
-          export DEVKITARM=$DEVKITPRO/devkitARM
-          export PATH=$PATH:$DEVKITPRO/tools/bin:$DEVKITARM/bin
-          echo "DEVKITPRO=$DEVKITPRO" >> $GITHUB_ENV
-          echo "DEVKITARM=$DEVKITARM" >> $GITHUB_ENV
-          echo "PATH=$PATH" >> $GITHUB_ENV
+          sudo apt-get update
+          sudo apt-get install -y curl xz-utils git
 
-      - name: Compile main.c to boot.elf
+      - name: Install devkitPro
         run: |
-          arm-none-eabi-gcc -march=armv6k -mtune=mpcore -mfloat-abi=hard -mfpu=vfp -O2 -Wall -I$DEVKITPRO/libctru/include -c main.c -o main.o
+          curl -L https://downloads.devkitpro.org/devkitpro-pacman-2024.02.07-x86_64.tar.xz -o /tmp/devkitpro.tar.xz
+          sudo tar -xvf /tmp/devkitpro.tar.xz -C /opt
+          sudo /opt/devkitPro/pacman/bin/dkp-pacman --noconfirm -Syu
+          sudo /opt/devkitPro/pacman/bin/dkp-pacman --noconfirm -S devkitARM libctru ctrulib
+
+      - name: Set environment variables
+        run: |
+          echo "DEVKITPRO=/opt/devkitPro" >> $GITHUB_ENV
+          echo "DEVKITARM=/opt/devkitPro/devkitARM" >> $GITHUB_ENV
+          echo "PATH=/opt/devkitPro/tools/bin:/opt/devkitPro/devkitARM/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Build boot.elf
+        run: |
+          arm-none-eabi-gcc -O2 -Wall -march=armv6k -mtune=mpcore -mfloat-abi=hard -mfpu=vfp -I$DEVKITPRO/libctru/include -c main.c -o main.o
           arm-none-eabi-gcc main.o -L$DEVKITPRO/libctru/lib -lctru -lc -lm -lgcc -nostartfiles -Ttext=0x08000000 -o boot.elf
 
-      - name: Convert ELF to FIRM
+      - name: Convert to boot.firm
         run: |
           ctrtool -t elf2firm boot.elf -o boot.firm
 
-      - name: Upload boot.firm artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: boot-firm
