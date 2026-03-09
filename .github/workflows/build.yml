@@ -1,4 +1,4 @@
-name: Build 3DS
+name: Build 3DS Project
 
 on:
   push:
@@ -10,25 +10,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    # Step 1: Checkout your repo
     - uses: actions/checkout@v3
 
-    - name: Install dependencies
+    # Step 2: Install required dependencies
+    - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y git make gcc wget tar
 
+    # Step 3: Install devkitPro manually
     - name: Install devkitPro and devkitARM
       run: |
-        curl -fsSL https://apt.devkitpro.org/devkitpro.gpg | sudo tee /usr/share/keyrings/devkitpro-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/devkitpro-archive-keyring.gpg] https://apt.devkitpro.org stable main" | sudo tee /etc/apt/sources.list.d/devkitpro.list
-        sudo apt update
-        sudo apt install -y devkitpro-pacman
-        sudo dkp-pacman -Syu --noconfirm devkitARM libctru
+        curl -L https://downloads.devkitpro.org/devkitpro-pacman-2024.02.07-x86_64.tar.xz -o /tmp/devkitpro.tar.xz
+        sudo tar -xJf /tmp/devkitpro.tar.xz -C /opt
+        echo "export DEVKITPRO=/opt/devkitpro" >> $GITHUB_ENV
+        echo "export DEVKITARM=/opt/devkitpro/devkitARM" >> $GITHUB_ENV
+        echo "export PATH=/opt/devkitpro/devkitARM/bin:$PATH" >> $GITHUB_ENV
 
-    - name: Build 3DS project
+    # Step 4: Install devkitARM & libctru packages
+    - name: Install devkitARM and libctru
+      shell: bash
+      run: |
+        source $GITHUB_ENV
+        /opt/devkitpro/devkitpro-pacman/bin/dkp-pacman -Syu --noconfirm devkitARM libctru
+
+    # Step 5: Build the 3DS project
+    - name: Build launcher
       run: make
 
-    - name: Upload 3DSX artifact
+    # Step 6: Upload the 3DSX artifact
+    - name: Upload 3DSX
       uses: actions/upload-artifact@v4
       with:
         name: 3ds-build
