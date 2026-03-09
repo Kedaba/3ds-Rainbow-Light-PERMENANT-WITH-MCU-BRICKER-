@@ -1,29 +1,42 @@
-name: Build 3DS Project
+name: Build 3DS FIRM
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     container:
-      image: devkitpro/devkitpro:latest
+      image: ghcr.io/devkitpro/devkitpro:latest
 
     steps:
-    - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Install additional packages
-      run: |
-        apt-get update
-        apt-get install -y make gcc git
+      - name: Set up environment variables
+        run: |
+          export DEVKITPRO=/opt/devkitpro
+          export DEVKITARM=$DEVKITPRO/devkitARM
+          export PATH=$PATH:$DEVKITPRO/tools/bin:$DEVKITARM/bin
+          echo "DEVKITPRO=$DEVKITPRO" >> $GITHUB_ENV
+          echo "DEVKITARM=$DEVKITARM" >> $GITHUB_ENV
+          echo "PATH=$PATH" >> $GITHUB_ENV
 
-    - name: Build project
-      run: make
+      - name: Compile main.c to boot.elf
+        run: |
+          arm-none-eabi-gcc -march=armv6k -mtune=mpcore -mfloat-abi=hard -mfpu=vfp -O2 -Wall -I$DEVKITPRO/libctru/include -c main.c -o main.o
+          arm-none-eabi-gcc main.o -L$DEVKITPRO/libctru/lib -lctru -lc -lm -lgcc -nostartfiles -Ttext=0x08000000 -o boot.elf
 
-    - name: Upload 3DSX artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: 3ds-build
-        path: build/launcher.3dsx
+      - name: Convert ELF to FIRM
+        run: |
+          ctrtool -t elf2firm boot.elf -o boot.firm
+
+      - name: Upload boot.firm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-firm
+          path: boot.firm
