@@ -2,8 +2,7 @@ name: Build 3DS
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -13,16 +12,24 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Setup devkitPro
-      uses: devkitPro/devkitpro-actions@v1
-      with:
-        packages: "devkitARM libctru"
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git make gcc wget tar
+
+    - name: Install devkitPro and devkitARM
+      run: |
+        curl -fsSL https://apt.devkitpro.org/devkitpro.gpg | sudo tee /usr/share/keyrings/devkitpro-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/devkitpro-archive-keyring.gpg] https://apt.devkitpro.org stable main" | sudo tee /etc/apt/sources.list.d/devkitpro.list
+        sudo apt update
+        sudo apt install -y devkitpro-pacman
+        sudo dkp-pacman -Syu --noconfirm devkitARM libctru
 
     - name: Build 3DS project
       run: make
 
-    - name: Upload 3DSX
-      uses: actions/upload-artifact@v3
+    - name: Upload 3DSX artifact
+      uses: actions/upload-artifact@v4
       with:
         name: 3ds-build
         path: build/launcher.3dsx
