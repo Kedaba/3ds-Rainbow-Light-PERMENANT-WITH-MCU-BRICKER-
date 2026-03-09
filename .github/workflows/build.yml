@@ -1,8 +1,9 @@
-name: Build 3DS FIRM
+name: Build 3DS .firm
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -10,38 +11,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl xz-utils git
+    - name: Upload prebuilt devkitARM + libctru
+      uses: actions/download-artifact@v4
+      with:
+        name: devkitARM-archive
+        path: /tmp/devkitpro
 
-      - name: Install devkitPro
-        run: |
-          curl -L https://downloads.devkitpro.org/devkitpro-pacman-2024.02.07-x86_64.tar.xz -o /tmp/devkitpro.tar.xz
-          sudo tar -xvf /tmp/devkitpro.tar.xz -C /opt
-          sudo /opt/devkitPro/pacman/bin/dkp-pacman --noconfirm -Syu
-          sudo /opt/devkitPro/pacman/bin/dkp-pacman --noconfirm -S devkitARM libctru ctrulib
+    - name: Extract toolchain
+      run: |
+        mkdir -p $HOME/devkitPro
+        tar -xf /tmp/devkitpro/devkitpro.tar.xz -C $HOME/devkitPro
 
-      - name: Set environment variables
-        run: |
-          echo "DEVKITPRO=/opt/devkitPro" >> $GITHUB_ENV
-          echo "DEVKITARM=/opt/devkitPro/devkitARM" >> $GITHUB_ENV
-          echo "PATH=/opt/devkitPro/tools/bin:/opt/devkitPro/devkitARM/bin:$PATH" >> $GITHUB_ENV
+    - name: Add devkitPro to PATH
+      run: |
+        echo "$HOME/devkitPro/devkitARM/bin:$HOME/devkitPro/tools/bin:$PATH" >> $GITHUB_PATH
 
-      - name: Build boot.elf
-        run: |
-          arm-none-eabi-gcc -O2 -Wall -march=armv6k -mtune=mpcore -mfloat-abi=hard -mfpu=vfp -I$DEVKITPRO/libctru/include -c main.c -o main.o
-          arm-none-eabi-gcc main.o -L$DEVKITPRO/libctru/lib -lctru -lc -lm -lgcc -nostartfiles -Ttext=0x08000000 -o boot.elf
+    - name: Compile main.c
+      run: |
+        mkdir -p build
+        cd build
+        $HOME/devkitPro/devkitARM/bin/arm-none-eabi-gcc -o launcher.elf ../main.c -lc -lctru -mfloat-abi=hard -march=armv6k
+        $HOME/devkitPro/devkitARM/bin/3dsxtool launcher.elf boot.firm
 
-      - name: Convert to boot.firm
-        run: |
-          ctrtool -t elf2firm boot.elf -o boot.firm
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: boot-firm
-          path: boot.firm
+    - name: Upload boot.firm artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: boot-firm
+        path: build/boot.firm
